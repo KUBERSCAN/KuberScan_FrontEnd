@@ -12,7 +12,7 @@ const Header = () => {
         <nav>
             <a href="#features">Information</a>
             <a href="#about">About</a>
-            <button class="login-btn">Log in</button>
+            <a href="/login" class="login-btn">Log in</a>
         </nav>
     </header>
     )

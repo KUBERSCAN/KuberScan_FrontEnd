@@ -4,7 +4,6 @@ import Header from "./Header.tsx";
 const Index = () => {
   return (
     <>
-      <Header />
       <section class="main">
         <h1>
           <span>Kuberscan, your Kubernetes Incident Detector</span>
@@ -13,7 +12,7 @@ const Index = () => {
           Kuberscan provides you a easy to use UI to manage your kubernetes
           clusters
         </p>
-        <button class="button1">Start Using KuberScan</button>
+        <a class="button1" href="/login">Start Using KuberScan</a>
 
         <div class="mockup-container fade-in-up">
           <div class="feature-card pink">
@@ -175,9 +174,8 @@ const Index = () => {
 
       <section style="text-align: center; padding: 120px 5%;">
         <h2 class="section-title">Ready to start?</h2>
-        <button class="button1">Login</button>
+        <a href="/login" class="button1">Login</a>
       </section>
-      <Footer />
     </>
   );
 };
