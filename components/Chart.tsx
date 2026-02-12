@@ -1,20 +1,53 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { deletedPods, quarantinedPods } from "../signals.ts";
 
-interface ChartProps {
-  data: {
-    Connected_Users: number;
-    Incidents: number;
-    Alerts: number;
-    Quarantined: number;
-    Deleted: number;
-  };
+interface Data {
+  Connected_Users: number;
+  Incidents: number;
+  Alerts: number;
+  Quarantined: number;
+  Deleted: number;
 }
 
-function Chart({ data }: ChartProps) {
+const fetchdata = async () => {
+  const alerts = await fetchAlerts();
+  const incidents = await fetchIncidents();
+  const alertnumber = alerts.length;
+  const incidentnumber = incidents.length;
+  return {
+    Connected_Users: 1,
+    Incidents: incidentnumber,
+    Alerts: alertnumber,
+    Quarantined: quarantinedPods.value,
+    Deleted: deletedPods.value,
+  };
+};
+const fetchAlerts = async () => {
+  const response = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/data/alerts",
+  );
+  const data = await response.json();
+  return data;
+};
+const fetchIncidents = async () => {
+  const response = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/data/incidents",
+  );
+  const data = await response.json();
+  return data;
+};
+
+function Chart() {
+  const [data, setData] = useState<Data>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+
   useEffect(() => {
-    if (!canvasRef.current) return;
+    const fetchAndSet = async () => {
+    const response = await fetchdata();
+    setData(response);
+    }
+    fetchAndSet();
+    if (!canvasRef.current || !data) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -40,9 +73,9 @@ function Chart({ data }: ChartProps) {
     const canvasWidth = canvas.width;
     const padding = 40;
     const usableWidth = canvasWidth - (padding * 2);
-    const barWidth = usableWidth / chartData.length * 0.6; 
+    const barWidth = usableWidth / chartData.length * 0.6;
     const barSpacing = usableWidth / chartData.length * 0.4;
-    
+
     const maxValue = Math.max(...chartData.map((d) => d.value), 1);
     const chartHeight = 200;
     const startY = 250;
@@ -69,10 +102,13 @@ function Chart({ data }: ChartProps) {
       ctx.fillText(
         item.value.toFixed(1),
         x + barWidth / 2,
-        y - 10
+        y - 10,
+      
       );
     });
   }, [data]);
+
+
 
   return (
     <div class="chart-container">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import IncidentComponent from "./IncidentComponent.tsx";
-
+import LoadingIsland from "../islands/LoadingIsland.tsx";
 type Incident = {
   id: string,
   pod: string,
@@ -15,20 +15,22 @@ type Incident = {
 
 const fetchIncidents = async () => {
     const response = await fetch('https://dynamicalerts.sergioom9.deno.net/data/incidents');
-    const data = undefined; //await response.json();
+    const data = response.json();
     return data;
 }
 
 
 function Incidents() {
     const [incidents, setIncidents] = useState<Incident[]>([]);
-
+    const [loading,setLoading] = useState(true)
     useEffect(() => {
+      setLoading(true)
         const fetchAndSetIncidents = async () => {
             const incidents = await fetchIncidents();
             setIncidents(incidents || []);
         };
         fetchAndSetIncidents();
+        setLoading(false)
     }, []);
     const groupedIncidents = Object.values(
         incidents.reduce((acc, incident) => {
@@ -38,7 +40,7 @@ function Incidents() {
     return acc;
   }, {} as Record<string, typeof incidents[0]>)
 );
-
+if(loading){return <LoadingIsland />}
   return (
     <div style="margin-top:90px; margin-inline:30px">
       <p class="alerts-info">Incidents are shown grouped by POD by latest one</p>

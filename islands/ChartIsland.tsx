@@ -1,18 +1,9 @@
 import Chart from "../components/Chart.tsx";
 
-interface ChartProps {
-  data: {
-    Connected_Users: number;
-    Incidents: number;
-    Alerts: number;
-    Quarantined: number;
-    Deleted: number;
-  };
-}
 
-const ChartIsland = ({data}:ChartProps) => {
+const ChartIsland = () => {
     return (
-        <Chart data={data} />
+        <Chart  />
     );
 }  
 

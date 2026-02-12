@@ -1,8 +1,7 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { deletedPods, quarantinedPods } from "../signals.ts";
-
-interface Notification {
-  id: string;
+import LoadingIsland from "../islands/LoadingIsland.tsx";
+interface Alerts {
   output: string;
   containerid: string;
   containername: string;
@@ -13,33 +12,35 @@ interface Notification {
   priority: string;
   rule: string;
   time: string;
-  source: string;
   tags: string[];
-  read: boolean;
-  type: "Critical" | "Warning" | "Info";
   quarantined: boolean;
   deleted: boolean;
 }
 
-type PropData = {
-  data: Notification[];
+
+const fetchData = async () => {
+  const alerts = await fetchAlerts();
+  const mappedalerts = alerts.map((elem: any) => ({
+    ...elem,
+    quarantined: false, 
+    deleted: false,    
+  }));
+  return mappedalerts
 };
 
-export default function Notifications(data: PropData) {
-  const [notifications, setNotifications] = useState<Notification[]>(data.data);
+const fetchAlerts = async () => {
+  const response = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/data/alerts",
+  );
+  const data = await response.json();
+  return data;
+};
 
+
+export default function Notifications() {
+  const [notifications, setNotifications] = useState<Alerts[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+  const [loading,setLoading] = useState(true)
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -76,40 +77,57 @@ export default function Notifications(data: PropData) {
   };
 
   const deletePod = (podname: string, namespace: string) => {
-  setNotifications((prev) =>
-    prev.map((n) =>
-      n.podname === podname && n.namespace === namespace
-        ? { ...n, deleted: true }
-        : n
-    )
-  );
-  deletedPods.value += 1;
-};
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.podname === podname && n.namespace === namespace
+          ? { ...n, deleted: true }
+          : n
+      )
+    );
+    deletedPods.value += 1;
+  };
 
-const quarantinePod = (podname: string, namespace: string) => {
-  setNotifications((prev) =>
-    prev.map((n) =>
-      n.podname === podname && n.namespace === namespace
-        ? { ...n, quarantined: true }
-        : n
-    )
-  );
-  quarantinedPods.value += 1;
-};
+  const quarantinePod = (podname: string, namespace: string) => {
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.podname === podname && n.namespace === namespace
+          ? { ...n, quarantined: true }
+          : n
+      )
+    );
+    quarantinedPods.value += 1;
+  };
+
+  useEffect(() => {
+  const fetchAndSetStats = async () => {
+    setLoading(true)
+    const data = await fetchData(); 
+
+    const uniqueAlertsMap = new Map<string, Alerts>();
+    data.forEach((alert:Alerts) => {
+      if (!uniqueAlertsMap.has(alert.podname)) {
+        uniqueAlertsMap.set(alert.podname, alert);
+      }
+    });
+
+    const uniqueAlerts = Array.from(uniqueAlertsMap.values());
+
+    setNotifications(uniqueAlerts);
+  };
+
+  fetchAndSetStats();
+  setLoading(false)
+}, []);
+
+if (loading) {
+    return <LoadingIsland />;
+  }
 
   return (
     <div class="notifications-container">
       <div class="notifications-header">
         <h2>Alerts</h2>
         <div class="notifications-actions">
-          {unreadCount > 0 && (
-            <>
-              <span class="unread-badge">{unreadCount} new</span>
-              <button onClick={markAllAsRead} class="mark-all-btn">
-                Mark all as read
-              </button>
-            </>
-          )}
           <button
             onClick={() => setIsOpen(!isOpen)}
             class="toggle-btn"
@@ -130,12 +148,8 @@ const quarantinePod = (podname: string, namespace: string) => {
             : (
               notifications.slice(0, 3).map((notification) => (
                 <div
-                  key={notification.id}
-                  class={`notification-item ${
-                    notification.read ? "read" : "unread"
-                  } notification-${notification.type.toLowerCase()}`}
-                  onClick={() =>
-                    !notification.read && markAsRead(notification.id)}
+                  key={notification.podname}
+                  class={`notification-item notification-${notification.priority.toLowerCase()}`}
                 >
                   {(notification.quarantined || notification.deleted) && (
                     <div
@@ -177,19 +191,19 @@ const quarantinePod = (podname: string, namespace: string) => {
                     class="notification-icon"
                     style={{
                       background: `linear-gradient(135deg, ${
-                        getNotificationColor(notification.type)
-                      }, ${getNotificationColor(notification.type)}99)`,
+                        getNotificationColor(notification.priority)
+                      }, ${getNotificationColor(notification.priority)}99)`,
                     }}
                   >
-                    {getNotificationIcon(notification.type)}
+                    {getNotificationIcon(notification.priority)}
                   </div>
 
                   <div class="notification-content">
                     <div class="notification-header">
                       <span
-                        class={`notification-badge ${notification.type.toLowerCase()}`}
+                        class={`notification-badge ${notification.priority.toLowerCase()}`}
                       >
-                        {notification.type}
+                        {notification.priority}
                       </span>
                       <span class="notification-priority">
                         Priority: {notification.priority}
@@ -228,10 +242,6 @@ const quarantinePod = (podname: string, namespace: string) => {
                         <span class="detail-label">Rule:</span>
                         <span class="detail-value">{notification.rule}</span>
                       </div>
-                      <div class="detail-row">
-                        <span class="detail-label">Source:</span>
-                        <span class="detail-value">{notification.source}</span>
-                      </div>
                       {notification.tags && notification.tags.length > 0 && (
                         <div class="detail-row">
                           <span class="detail-label">Tags:</span>
@@ -244,13 +254,16 @@ const quarantinePod = (podname: string, namespace: string) => {
                       )}
                       <div class="detail-row">
                         <span class="detail-label">Quarantined:</span>
-                        <span class="detail-value">{notification.quarantined ? "Yes" : "No"}</span>
+                        <span class="detail-value">
+                          {notification.quarantined ? "Yes" : "No"}
+                        </span>
                       </div>
                       <div class="detail-row">
                         <span class="detail-label">Deleted:</span>
-                        <span class="detail-value">{notification.deleted ? "Yes" : "No"}</span>
+                        <span class="detail-value">
+                          {notification.deleted ? "Yes" : "No"}
+                        </span>
                       </div>
-
                     </div>
 
                     <div class="notification-actions">

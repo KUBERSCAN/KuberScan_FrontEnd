@@ -57,7 +57,7 @@ app.post("/api/login", async (ctx) => {
   }
 });
 
-app.post("/api/logout", async (ctx) => {
+app.post("/api/logout", (ctx) => {
   try {
     return new Response("", {
       status: 303,

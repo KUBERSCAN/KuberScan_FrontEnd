@@ -1,8 +1,8 @@
-import GroupAlerts from "../components/GroupAlert.tsx"
+import GroupAlert from "../components/GroupAlert.tsx"
 
 
 const GroupAlertIsland = () => {
-    return <GroupAlerts />
+    return <GroupAlert />
 }
 
 export default GroupAlertIsland
