@@ -76,27 +76,47 @@ export default function Notifications() {
     return date.toLocaleDateString();
   };
 
-  const deletePod = (podname: string, namespace: string) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.podname === podname && n.namespace === namespace
-          ? { ...n, deleted: true }
-          : n
-      )
-    );
+const deletePod = async (podname: string, namespace: string) => {
+  const deletePod = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/pod/delete'",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pod: podname,
+        namespace: namespace,
+      }),
+    },
+  );
+  if(deletePod.ok){
     deletedPods.value += 1;
-  };
+    return "success"
+  }
+  return "failure"
+};
 
-  const quarantinePod = (podname: string, namespace: string) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.podname === podname && n.namespace === namespace
-          ? { ...n, quarantined: true }
-          : n
-      )
-    );
+const quarantinePod = async (podname: string, namespace: string) => {
+    const quarantinePod = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/pod/quarantine'",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pod: podname,
+        namespace: namespace,
+      }),
+    },
+  );
+  if(quarantinePod.ok){
     quarantinedPods.value += 1;
-  };
+    return "success"
+  }
+  return "failure"
+};
 
   useEffect(() => {
   const fetchAndSetStats = async () => {

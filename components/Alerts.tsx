@@ -21,7 +21,6 @@ type Alert = {
 const fetchAlerts = async () => {
     const response = await fetch('https://dynamicalerts.sergioom9.deno.net/data/alerts');
     const data = await response.json();
-    console.log(data)
     return data;
 }
 

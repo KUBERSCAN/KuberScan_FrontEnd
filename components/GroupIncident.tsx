@@ -27,24 +27,50 @@ function GroupIncidents() {
   const [pod, setPod] = useState<string>("");
   const [namespace, setNamespace] = useState<string>("");
   const [currentStatus, setCurrentStatus] = useState<"open" | "quarantined" | "deleted">("open");
-    const [loading,setLoading] = useState(true)
-  const deletePod = () => {
-    deletedPods.value += 1;
-    setCurrentStatus("deleted");
-    setIncidents(incidents.map((elem: Incident) => ({
-      ...elem,
-      status: "deleted" as const
-    })));
-  };
+  const [loading,setLoading] = useState(true)
+  //const [recharge,setRechargue] = useState(false)
 
-  const quarantinePod = () => {
+  const deletePod = async (podname: string, namespace: string) => {
+  const deletePod = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/pod/delete'",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pod: podname,
+        namespace: namespace,
+      }),
+    },
+  );
+  if(deletePod.ok){
+    deletedPods.value += 1;
+    return "success"
+  }
+  return "failure"
+};
+
+const quarantinePod = async (podname: string, namespace: string) => {
+    const quarantinePod = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/pod/quarantine'",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pod: podname,
+        namespace: namespace,
+      }),
+    },
+  );
+  if(quarantinePod.ok){
     quarantinedPods.value += 1;
-    setCurrentStatus("quarantined");
-    setIncidents(incidents.map((elem: Incident) => ({
-      ...elem,
-      status: "quarantined" as const
-    })));
-  };
+    return "success"
+  }
+  return "failure"
+};
 
   useEffect(() => {
     const fetchandsetIncidents = async () => {
@@ -65,6 +91,7 @@ function GroupIncidents() {
     };
     fetchandsetIncidents();
   }, []);
+
 if(loading){return <LoadingIsland />}
   return (
     <div style={{ marginTop: "100px", marginInline: "30px" }}>
@@ -85,7 +112,7 @@ if(loading){return <LoadingIsland />}
           onClick={(e) => {
             e.stopPropagation();
             if (currentStatus === "open") {
-              quarantinePod();
+              quarantinePod(pod,namespace);
             }
           }}
           disabled={currentStatus !== "open"}
@@ -103,7 +130,7 @@ if(loading){return <LoadingIsland />}
           onClick={(e) => {
             e.stopPropagation();
             if (currentStatus !== "deleted") {
-              deletePod();
+              deletePod(pod,namespace);
             }
           }}
           disabled={currentStatus === "deleted"}
@@ -145,7 +172,7 @@ if(loading){return <LoadingIsland />}
             <p>No incidents found for this pod</p>
           ) : (
             incidents.map((elem, index) => (
-              <IncidentComponent key={index} data={elem} />
+              <IncidentComponent data={elem} clickable={false}/>
             ))
           )}
         </div>

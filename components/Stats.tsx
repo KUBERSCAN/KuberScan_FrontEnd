@@ -12,8 +12,10 @@ type Stats = {
 const fetchdata = async () => {
   const alerts = await fetchAlerts();
   const incidents = await fetchIncidents();
+  const quarantined = await fetchQuarantined();
   const alertnumber = alerts.length;
   const incidentnumber = incidents.length;
+  quarantinedPods.value = quarantined.length
   return {
     user: {
       email: "admin@example.com",
@@ -23,7 +25,7 @@ const fetchdata = async () => {
       Connected_Users: 1,
       Incidents: incidentnumber,
       Alerts: alertnumber,
-      Quarantined: quarantinedPods.value,
+      Quarantined: quarantined.length,
       Deleted: deletedPods.value,
     },
     alerts,
@@ -45,6 +47,13 @@ const fetchIncidents = async () => {
   const data = await response.json();
   return data;
 };
+const fetchQuarantined = async () =>{
+  const response = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/data/quarantined",
+  );
+  const data = await response.json();
+  return data;
+}
 
 const Stats = () => {
   const [stats, setStats] = useState<Stats>();
@@ -95,10 +104,12 @@ const Stats = () => {
           <p class="stat-value">{stats.Alerts}</p>
         </div>
       </a>
+      <a href="/quarantine" style={{ textDecoration: "none", color: "inherit" }}>
       <div class="stat-card">
         <h3>Quarantined</h3>
         <p class="stat-value">{stats.Quarantined}</p>
       </div>
+      </a>
       <div class="stat-card">
         <h3>Deleted</h3>
         <p class="stat-value">{stats.Deleted}</p>
