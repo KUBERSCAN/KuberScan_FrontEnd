@@ -88,10 +88,6 @@ const Stats = () => {
   }
   return (
     <div class="stats-grid">
-      <div class="stat-card">
-        <h3>Connected Users</h3>
-        <p class="stat-value">{stats.Connected_Users}</p>
-      </div>
       <a href="/incidents" style={{ textDecoration: "none", color: "inherit" }}>
         <div class="stat-card">
           <h3>Incidents</h3>

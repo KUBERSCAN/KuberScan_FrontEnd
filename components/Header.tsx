@@ -10,6 +10,7 @@ const Header = () => {
             KuberScan
         </div>
         <nav>
+            <a href="/static/scan">Scan Image</a>
             <a href="#features">Information</a>
             <a href="#about">About</a>
             <a href="/login" class="login-btn">Log in</a>

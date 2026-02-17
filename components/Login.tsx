@@ -1,4 +1,3 @@
-import { PageProps } from "$fresh/server.ts";
 import ErrorBoxIsland from "../islands/ErrorBoxIsland.tsx";
 
 

@@ -615,7 +615,17 @@ html {
 .login-form label:first-of-type {
   margin-top: 0;
 }
-
+.login-form input[type="text"] {
+  width: 100%;
+  background: #1a1b23;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px 18px;
+  color: #ffffff;
+  font-size: 15px;
+  transition: all 0.3s;
+  font-family: inherit;
+}
 .login-form input[type="email"],
 .login-form input[type="password"] {
   width: 100%;
@@ -677,7 +687,11 @@ html {
   align-items: center;
   margin-bottom: 40px;
 }
-
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px; 
+}
 .dashboard-header h1 {
   font-size: 32px;
   font-weight: 800;
