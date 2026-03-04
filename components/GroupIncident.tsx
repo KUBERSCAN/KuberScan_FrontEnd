@@ -2,107 +2,167 @@ import { useEffect, useState } from "preact/hooks";
 import IncidentComponent from "./IncidentComponent.tsx";
 import { deletedPods, quarantinedPods } from "../signals.ts";
 import LoadingIsland from "../islands/LoadingIsland.tsx";
+
 type Incident = {
-  id: string,
-  pod: string,
-  namespace: string,
-  firstSeen: string,
-  lastSeen: string,
-  severity: string,
-  alertCount: number,
-  status: "open" | "quarantined" | "deleted"
-}
+  id: string;
+  pod: string;
+  namespace: string;
+  severity: string;
+  alertCount: number;
+  status: "open" | "quarantined" | "deleted";
+};
 
 const fetchIncident = async () => {
   const pathParts = globalThis.location.pathname.split("/");
   const id = atob(pathParts[2]);
-  const response = await fetch('https://dynamicalerts.sergioom9.deno.net/data/incidents');
+  const response = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/data/incidents",
+  );
   const data = await response.json();
-  const filteredData = data.filter((elem: Incident) => elem.pod === id);
-  return filteredData;
-}
+  return data.filter((elem: Incident) => elem.pod === id);
+};
 
 function GroupIncidents() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [pod, setPod] = useState<string>("");
   const [namespace, setNamespace] = useState<string>("");
-  const [currentStatus, setCurrentStatus] = useState<"open" | "quarantined" | "deleted">("open");
-  const [loading,setLoading] = useState(true)
-  //const [recharge,setRechargue] = useState(false)
+  const [currentStatus, setCurrentStatus] = useState<
+    "open" | "quarantined" | "deleted"
+  >("open");
+  const [loading, setLoading] = useState(true);
 
-  const deletePod = async (podname: string, namespace: string) => {
-  const deletePod = await fetch(
-    "https://dynamicalerts.sergioom9.deno.net/pod/delete'",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        pod: podname,
-        namespace: namespace,
-      }),
-    },
-  );
-  if(deletePod.ok){
-    deletedPods.value += 1;
-    return "success"
-  }
-  return "failure"
-};
+  const applyStatus = (status: "open" | "quarantined" | "deleted") => {
+    setCurrentStatus(status);
+    setIncidents((prev) => prev.map((elem: Incident) => ({ ...elem, status })));
+  };
 
-const quarantinePod = async (podname: string, namespace: string) => {
-    const quarantinePod = await fetch(
-    "https://dynamicalerts.sergioom9.deno.net/pod/quarantine'",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+  const deleteIncident = async () => {
+    if (!pod || !namespace) return;
+
+    const response = await fetch(
+      "https://dynamicalerts.sergioom9.deno.net/incident",
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pod, namespace }),
       },
-      body: JSON.stringify({
-        pod: podname,
-        namespace: namespace,
-      }),
-    },
-  );
-  if(quarantinePod.ok){
-    quarantinedPods.value += 1;
-    return "success"
-  }
-  return "failure"
-};
+    );
+
+    if (response.ok) {
+      setIncidents([]);
+    }
+  };
+
+  const deletePod = async () => {
+    if (!pod || !namespace) return;
+
+    const response = await fetch(
+      "https://dynamicalerts.sergioom9.deno.net/pod/delete",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pod, namespace }),
+      },
+    );
+
+    if (response.ok) {
+      deletedPods.value += 1;
+      applyStatus("deleted");
+    }
+  };
+
+  const quarantinePod = async () => {
+    if (!pod || !namespace) return;
+
+    const response = await fetch(
+      "https://dynamicalerts.sergioom9.deno.net/pod/quarantine",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pod, namespace }),
+      },
+    );
+
+    if (response.ok) {
+      quarantinedPods.value += 1;
+      applyStatus("quarantined");
+    }
+  };
+
+  const dequarantinePod = async () => {
+    if (!pod || !namespace) return;
+
+    const response = await fetch(
+      "https://dynamicalerts.sergioom9.deno.net/pod/quarantine",
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pod, namespace }),
+      },
+    );
+
+    if (response.ok) {
+      quarantinedPods.value = Math.max(0, quarantinedPods.value - 1);
+      applyStatus("open");
+    }
+  };
 
   useEffect(() => {
     const fetchandsetIncidents = async () => {
-     try{
-        setLoading(true)
+      try {
+        setLoading(true);
         const incidents = await fetchIncident();
         setIncidents(incidents);
         if (incidents.length > 0) {
-        setPod(incidents[0].pod);
-        setNamespace(incidents[0].namespace);
-        setCurrentStatus(incidents[0].status); 
+          setPod(incidents[0].pod);
+          setNamespace(incidents[0].namespace);
+          setCurrentStatus(incidents[0].status || "open");
         }
       } catch (error) {
-        console.error("Error fetching alerts:", error);
-      }finally{
-        setLoading(false)
+        console.error("Error fetching incidents:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchandsetIncidents();
   }, []);
 
-if(loading){return <LoadingIsland />}
+  if (loading) {
+    return <LoadingIsland />;
+  }
+
   return (
     <div style={{ marginTop: "100px", marginInline: "30px" }}>
-      <div class="notification-actions">
-        <span
-          class="alerts-info"
-          style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "20px" }}
-        >
-          {pod}
-        </span>
-        
+      <div class="notification-actions pod-header-row">
+        <div class="pod-title-wrap">
+          <span class="alerts-info pod-title">{pod}</span>
+          <span class="count-badge">{incidents.length} incidents</span>
+        </div>
+
+        <button onClick={deleteIncident} class="action-btn delete-pod-btn">
+          Delete Incident
+        </button>
+
+        {currentStatus === "quarantined" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              dequarantinePod();
+            }}
+            class="action-btn view-pod-btn"
+          >
+            ✅ Dequarantine Pod
+          </button>
+        )}
+
         <button
           style={{
             maxHeight: "70px",
@@ -112,7 +172,7 @@ if(loading){return <LoadingIsland />}
           onClick={(e) => {
             e.stopPropagation();
             if (currentStatus === "open") {
-              quarantinePod(pod,namespace);
+              quarantinePod();
             }
           }}
           disabled={currentStatus !== "open"}
@@ -120,7 +180,7 @@ if(loading){return <LoadingIsland />}
         >
           🔒 Quarantine Pod
         </button>
-        
+
         <button
           style={{
             maxHeight: "70px",
@@ -130,7 +190,7 @@ if(loading){return <LoadingIsland />}
           onClick={(e) => {
             e.stopPropagation();
             if (currentStatus !== "deleted") {
-              deletePod(pod,namespace);
+              deletePod();
             }
           }}
           disabled={currentStatus === "deleted"}
@@ -142,40 +202,29 @@ if(loading){return <LoadingIsland />}
 
       {currentStatus !== "open" && (
         <div
+          class="status-banner"
           style={{
-            marginTop: "20px",
-            padding: "15px",
-            borderRadius: "8px",
-            background: currentStatus === "deleted" 
-              ? "rgba(239, 68, 68, 0.1)" 
+            background: currentStatus === "deleted"
+              ? "rgba(239, 68, 68, 0.1)"
               : "rgba(245, 158, 11, 0.1)",
             border: currentStatus === "deleted"
               ? "2px solid rgba(239, 68, 68, 0.5)"
               : "2px solid rgba(245, 158, 11, 0.5)",
             color: currentStatus === "deleted" ? "#fca5a5" : "#fbbf24",
-            fontWeight: "bold",
-            textAlign: "center",
           }}
         >
-          {currentStatus === "deleted" 
-            ? "⛔ DELETED - No more actions allowed" 
-            : "🔒 QUARANTINED - You can still delete"}
+          {currentStatus === "deleted"
+            ? "⛔ DELETED - No more actions allowed"
+            : "🔒 QUARANTINED - You can still delete or dequarantine"}
         </div>
       )}
 
-      <div 
-        class="notifications-container"
-        style={{ marginTop: "20px" }}
-      >
-        <div class="notifications-header">
-          {incidents.length === 0 ? (
-            <p>No incidents found for this pod</p>
-          ) : (
-            incidents.map((elem, index) => (
-              <IncidentComponent data={elem} clickable={false}/>
-            ))
-          )}
-        </div>
+      <div class="incidents-stack" style={{ marginTop: "20px" }}>
+        {incidents.length === 0 ? <p>No incidents found for this pod</p> : (
+          incidents.map((elem) => (
+            <IncidentComponent data={elem} clickable={false} />
+          ))
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
 import { deletedPods, quarantinedPods } from "../signals.ts";
 import LoadingIsland from "../islands/LoadingIsland.tsx";
-interface Alerts {
+
+interface AlertItem {
   output: string;
   containerid: string;
   containername: string;
@@ -13,34 +14,81 @@ interface Alerts {
   rule: string;
   time: string;
   tags: string[];
+  status: "open" | "quarantined" | "deleted";
   quarantined: boolean;
   deleted: boolean;
 }
 
+interface IncidentStatus {
+  pod: string;
+  status: "open" | "quarantined" | "deleted";
+}
 
-const fetchData = async () => {
-  const alerts = await fetchAlerts();
-  const mappedalerts = alerts.map((elem: any) => ({
-    ...elem,
-    quarantined: false, 
-    deleted: false,    
-  }));
-  return mappedalerts
-};
+interface QuarantinedPod {
+  pod: string;
+}
 
 const fetchAlerts = async () => {
   const response = await fetch(
     "https://dynamicalerts.sergioom9.deno.net/data/alerts",
   );
-  const data = await response.json();
-  return data;
+  return await response.json();
 };
 
+const fetchIncidents = async () => {
+  const response = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/data/incidents",
+  );
+  return await response.json();
+};
+
+const fetchQuarantined = async () => {
+  const response = await fetch(
+    "https://dynamicalerts.sergioom9.deno.net/data/quarantined",
+  );
+  return await response.json();
+};
+
+const fetchData = async () => {
+  const [alerts, incidents, quarantined] = await Promise.all([
+    fetchAlerts(),
+    fetchIncidents(),
+    fetchQuarantined(),
+  ]);
+
+  const statusByPod = new Map<string, IncidentStatus["status"]>();
+  const quarantinedPods = new Set<string>();
+
+  incidents.forEach((incident: IncidentStatus) => {
+    statusByPod.set(incident.pod, incident.status);
+  });
+
+  quarantined.forEach((item: QuarantinedPod) => {
+    quarantinedPods.add(item.pod);
+  });
+
+  return alerts.map((elem: any) => {
+    let status: IncidentStatus["status"] = statusByPod.get(elem.podname) ||
+      "open";
+
+    if (status === "open" && quarantinedPods.has(elem.podname)) {
+      status = "quarantined";
+    }
+
+    return {
+      ...elem,
+      status,
+      quarantined: status === "quarantined",
+      deleted: status === "deleted",
+    } as AlertItem;
+  });
+};
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<Alerts[]>([]);
+  const [notifications, setNotifications] = useState<AlertItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [loading,setLoading] = useState(true)
+  const [loading, setLoading] = useState(true);
+  const [hiddenPods, setHiddenPods] = useState<Set<string>>(new Set());
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -76,72 +124,111 @@ export default function Notifications() {
     return date.toLocaleDateString();
   };
 
-const deletePod = async (podname: string, namespace: string) => {
-  const deletePod = await fetch(
-    "https://dynamicalerts.sergioom9.deno.net/pod/delete'",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        pod: podname,
-        namespace: namespace,
-      }),
-    },
-  );
-  if(deletePod.ok){
-    deletedPods.value += 1;
-    return "success"
-  }
-  return "failure"
-};
-
-const quarantinePod = async (podname: string, namespace: string) => {
-    const quarantinePod = await fetch(
-    "https://dynamicalerts.sergioom9.deno.net/pod/quarantine'",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        pod: podname,
-        namespace: namespace,
-      }),
-    },
-  );
-  if(quarantinePod.ok){
-    quarantinedPods.value += 1;
-    return "success"
-  }
-  return "failure"
-};
-
-  useEffect(() => {
-  const fetchAndSetStats = async () => {
-    setLoading(true)
-    const data = await fetchData(); 
-
-    const uniqueAlertsMap = new Map<string, Alerts>();
-    data.forEach((alert:Alerts) => {
-      if (!uniqueAlertsMap.has(alert.podname)) {
-        uniqueAlertsMap.set(alert.podname, alert);
-      }
-    });
-
-    const uniqueAlerts = Array.from(uniqueAlertsMap.values());
-
-    setNotifications(uniqueAlerts);
+  const updateNotificationStatus = (
+    podname: string,
+    status: "open" | "quarantined" | "deleted",
+  ) => {
+    setNotifications((prev) =>
+      prev.map((item) =>
+        item.podname === podname
+          ? {
+            ...item,
+            status,
+            quarantined: status === "quarantined",
+            deleted: status === "deleted",
+          }
+          : item
+      )
+    );
   };
 
-  fetchAndSetStats();
-  setLoading(false)
-}, []);
+  const deletePod = async (podname: string, namespace: string) => {
+    const response = await fetch(
+      "https://dynamicalerts.sergioom9.deno.net/pod/delete",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pod: podname, namespace }),
+      },
+    );
 
-if (loading) {
+    if (response.ok) {
+      deletedPods.value += 1;
+      updateNotificationStatus(podname, "deleted");
+    }
+  };
+
+  const quarantinePod = async (podname: string, namespace: string) => {
+    const response = await fetch(
+      "https://dynamicalerts.sergioom9.deno.net/pod/quarantine",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pod: podname, namespace }),
+      },
+    );
+
+    if (response.ok) {
+      quarantinedPods.value += 1;
+      updateNotificationStatus(podname, "quarantined");
+    }
+  };
+
+  const dequarantinePod = async (podname: string, namespace: string) => {
+    const response = await fetch(
+      "https://dynamicalerts.sergioom9.deno.net/pod/quarantine",
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pod: podname, namespace }),
+      },
+    );
+
+    if (response.ok) {
+      quarantinedPods.value = Math.max(0, quarantinedPods.value - 1);
+      updateNotificationStatus(podname, "open");
+    }
+  };
+
+  const dismissNotification = (podname: string) => {
+    setHiddenPods((prev) => new Set(prev).add(podname));
+  };
+
+  useEffect(() => {
+    const fetchAndSetStats = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchData();
+
+        const uniqueAlertsMap = new Map<string, AlertItem>();
+        data.forEach((alert: AlertItem) => {
+          if (!uniqueAlertsMap.has(alert.podname)) {
+            uniqueAlertsMap.set(alert.podname, alert);
+          }
+        });
+
+        setNotifications(Array.from(uniqueAlertsMap.values()));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAndSetStats();
+  }, []);
+
+  if (loading) {
     return <LoadingIsland />;
   }
+
+  const visibleNotifications = notifications.filter((item) =>
+    !hiddenPods.has(item.podname)
+  );
 
   return (
     <div class="notifications-container">
@@ -159,36 +246,63 @@ if (loading) {
 
       {isOpen && (
         <div class="notifications-list">
-          {notifications.length === 0
+          {visibleNotifications.length === 0
             ? (
               <div class="empty-state">
                 <p>No notifications</p>
               </div>
             )
             : (
-              notifications.slice(0, 3).map((notification) => (
+              visibleNotifications.slice(0, 3).map((notification) => (
                 <div
                   key={notification.podname}
                   class={`notification-item notification-${notification.priority.toLowerCase()}`}
+                  style={{
+                    overflow: "hidden",
+                    borderRadius: "12px",
+                  }}
                 >
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      dismissNotification(notification.podname);
+                    }}
+                    aria-label="Hide alert"
+                    class="delete-notification-btn"
+                    style={{
+                      zIndex: 30,
+                      top: "10px",
+                      left: "10px",
+                      right: "auto",
+                    }}
+                  >
+                    ×
+                  </button>
+
                   {(notification.quarantined || notification.deleted) && (
                     <div
                       style={{
                         position: "absolute",
-                        top: "30px",
-                        right: "-35px",
-                        background: "linear-gradient(45deg, #f59e0b, #f97316)",
+                        top: "24px",
+                        right: "-56px",
+                        background: notification.deleted
+                          ? "linear-gradient(45deg, #dc2626, #ef4444)"
+                          : "linear-gradient(45deg, #f59e0b, #f97316)",
                         color: "white",
-                        padding: "8px 50px",
+                        width: "220px",
+                        textAlign: "center",
+                        padding: "8px 0",
                         transform: "rotate(45deg)",
-                        fontSize: "14px",
+                        fontSize: "13px",
                         fontWeight: "bold",
-                        boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-                        zIndex: 10,
+                        boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
+                        zIndex: 20,
                         letterSpacing: "1px",
+                        pointerEvents: "none",
                       }}
                     >
-                      SOLVED
+                      {notification.deleted ? "DELETED" : "QUARANTINED"}
                     </div>
                   )}
 
@@ -200,13 +314,26 @@ if (loading) {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        background: "rgba(0, 0, 0, 0.5)",
-                        backdropFilter: "blur(2px)",
-                        zIndex: 5,
-                        pointerEvents: "none",
+                        background: "rgba(255, 255, 255, 0.18)",
+                        backdropFilter: "blur(5px)",
+                        borderRadius: "12px",
+                        zIndex: 15,
+                        pointerEvents: notification.quarantined
+                          ? "auto"
+                          : "none",
+                        cursor: notification.quarantined
+                          ? "not-allowed"
+                          : "default",
+                      }}
+                      onClick={(e) => {
+                        if (notification.quarantined) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }
                       }}
                     />
                   )}
+
                   <div
                     class="notification-icon"
                     style={{
@@ -273,40 +400,69 @@ if (loading) {
                         </div>
                       )}
                       <div class="detail-row">
-                        <span class="detail-label">Quarantined:</span>
-                        <span class="detail-value">
-                          {notification.quarantined ? "Yes" : "No"}
-                        </span>
-                      </div>
-                      <div class="detail-row">
-                        <span class="detail-label">Deleted:</span>
-                        <span class="detail-value">
-                          {notification.deleted ? "Yes" : "No"}
-                        </span>
+                        <span class="detail-label">Status:</span>
+                        <span class="detail-value">{notification.status}</span>
                       </div>
                     </div>
 
-                    <div class="notification-actions">
+                    <div
+                      class="notification-actions"
+                      style={{
+                        pointerEvents: notification.quarantined
+                          ? "none"
+                          : "auto",
+                        opacity: notification.quarantined ? 0.7 : 1,
+                      }}
+                    >
+                      {notification.status === "quarantined" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dequarantinePod(
+                              notification.podname,
+                              notification.namespace,
+                            );
+                          }}
+                          class="action-btn view-pod-btn"
+                        >
+                          ✅ Dequarantine
+                        </button>
+                      )}
+
+                      <a
+                        href={`/pod/${btoa(notification.podname)}`}
+                        class="action-btn view-pod-btn"
+                      >
+                        View Pod
+                      </a>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          quarantinePod(
-                            notification.podname,
-                            notification.namespace,
-                          );
+                          if (notification.status === "open") {
+                            quarantinePod(
+                              notification.podname,
+                              notification.namespace,
+                            );
+                          }
                         }}
+                        disabled={notification.status !== "open"}
                         class="action-btn quarantine-btn"
                       >
                         🔒 Quarantine Pod
                       </button>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          deletePod(
-                            notification.podname,
-                            notification.namespace,
-                          );
+                          if (notification.status !== "deleted") {
+                            deletePod(
+                              notification.podname,
+                              notification.namespace,
+                            );
+                          }
                         }}
+                        disabled={notification.status === "deleted"}
                         class="action-btn delete-pod-btn"
                       >
                         🗑️ Delete Pod
@@ -316,12 +472,6 @@ if (loading) {
                 </div>
               ))
             )}
-          <button
-            class="mark-all-btn"
-            onClick={(e) => globalThis.location.href = "/alerts"}
-          >
-            See All
-          </button>
         </div>
       )}
     </div>

@@ -2,7 +2,8 @@ import { deletedPods, quarantinedPods } from "../signals.ts";
 
 type QuarantineProps = {
   data: {
-    podname: string;
+    pod?: string;
+    podname?: string;
     namespace: string;
   };
   clickable: boolean;
@@ -10,7 +11,7 @@ type QuarantineProps = {
 
 const dequarantinePod = async (podname: string, namespace: string) => {
   const dequarantine = await fetch(
-    "https://dynamicalerts.sergioom9.deno.net/pod/quarantine'",
+    "https://dynamicalerts.sergioom9.deno.net/pod/quarantine",
     {
       method: "DELETE",
       headers: {
@@ -18,20 +19,20 @@ const dequarantinePod = async (podname: string, namespace: string) => {
       },
       body: JSON.stringify({
         pod: podname,
-        namespace: namespace,
+        namespace,
       }),
     },
   );
-  if(dequarantine.ok){
-    quarantinedPods.value -= 1;
-    return "success"
+  if (dequarantine.ok) {
+    quarantinedPods.value = Math.max(0, quarantinedPods.value - 1);
+    return "success";
   }
-  return "failure"
+  return "failure";
 };
 
 const deletePod = async (podname: string, namespace: string) => {
   const deletePod = await fetch(
-    "https://dynamicalerts.sergioom9.deno.net/pod/delete'",
+    "https://dynamicalerts.sergioom9.deno.net/pod/delete",
     {
       method: "POST",
       headers: {
@@ -39,25 +40,27 @@ const deletePod = async (podname: string, namespace: string) => {
       },
       body: JSON.stringify({
         pod: podname,
-        namespace: namespace,
+        namespace,
       }),
     },
   );
-  if(deletePod.ok){
+  if (deletePod.ok) {
     deletedPods.value += 1;
-    return "success"
+    return "success";
   }
-  return "failure"
+  return "failure";
 };
 
 const QuarantineComponent = ({ data, clickable = true }: QuarantineProps) => {
-  const b64id = btoa(data.podname);
+  const podname = data.pod ?? data.podname ?? "";
+  const b64id = btoa(podname);
+
   if (!clickable) {
     return (
       <div class="notification-item">
         <p>
           <span style="color:red">Pod Name:</span>
-          {data.podname}
+          {podname}
         </p>
         <p>
           <span style="color:red">Namespace:</span>
@@ -66,7 +69,7 @@ const QuarantineComponent = ({ data, clickable = true }: QuarantineProps) => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            dequarantinePod(data.podname, data.namespace);
+            dequarantinePod(podname, data.namespace);
           }}
           class="action-btn delete-pod-btn"
         >
@@ -75,7 +78,7 @@ const QuarantineComponent = ({ data, clickable = true }: QuarantineProps) => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            deletePod(data.podname, data.namespace);
+            deletePod(podname, data.namespace);
           }}
           class="action-btn delete-pod-btn"
         >
@@ -84,15 +87,16 @@ const QuarantineComponent = ({ data, clickable = true }: QuarantineProps) => {
       </div>
     );
   }
+
   return (
     <a
-      href={`/quarantined/${b64id}`}
+      href={`/pod/${b64id}`}
       style={{ textDecoration: "none", color: "inherit" }}
     >
       <div class="notification-item">
         <p>
           <span style="color:red">Pod Name:</span>
-          {data.podname}
+          {podname}
         </p>
         <p>
           <span style="color:red">Namespace:</span>
@@ -102,4 +106,5 @@ const QuarantineComponent = ({ data, clickable = true }: QuarantineProps) => {
     </a>
   );
 };
+
 export default QuarantineComponent;

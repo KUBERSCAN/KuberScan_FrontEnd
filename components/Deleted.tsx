@@ -20,47 +20,18 @@ const fetchIncidents = async () => {
   return data;
 };
 
-function Incidents() {
+function Deleted() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const deleteIncident = async (
-    incident: { _id?: string; id: string; pod: string; namespace: string },
-  ) => {
-    const response = await fetch(
-      "https://dynamicalerts.sergioom9.deno.net/incident",
-      {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          _id: incident._id,
-          id: incident.id,
-          pod: incident.pod,
-          namespace: incident.namespace,
-        }),
-      },
-    );
-
-    if (response.ok) {
-      setIncidents((prev) =>
-        prev.filter((elem) =>
-          incident._id
-            ? elem._id !== incident._id
-            : !(elem.id === incident.id && elem.pod === incident.pod &&
-              elem.namespace === incident.namespace)
-        )
-      );
-    }
-  };
 
   useEffect(() => {
     const fetchAndSetIncidents = async () => {
       try {
         setLoading(true);
-        const incidents = await fetchIncidents();
-        setIncidents(incidents || []);
+        const data = await fetchIncidents();
+        setIncidents(
+          (data || []).filter((elem: Incident) => elem.status === "deleted"),
+        );
       } finally {
         setLoading(false);
       }
@@ -73,7 +44,7 @@ function Incidents() {
 
   return (
     <div style="margin-top:90px; margin-inline:30px">
-      <p class="alerts-info">Incidents list</p>
+      <p class="alerts-info">Deleted incidents</p>
       <div class="notifications-container">
         <div
           class="notifications-header"
@@ -84,17 +55,19 @@ function Incidents() {
             alignItems: "stretch",
           }}
         >
-          {incidents.map((elem: Incident) => (
-            <IncidentComponent
-              data={elem}
-              clickable={true}
-              onDeleteIncident={deleteIncident}
-            />
-          ))}
+          {incidents.length === 0
+            ? <p>No deleted incidents</p>
+            : incidents.map((elem) => (
+              <IncidentComponent
+                data={elem}
+                clickable={true}
+                showDeleteButton={false}
+              />
+            ))}
         </div>
       </div>
     </div>
   );
 }
 
-export default Incidents;
+export default Deleted;

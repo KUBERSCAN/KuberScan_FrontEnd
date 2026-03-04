@@ -169,7 +169,5 @@ app.post("/api/static/check", async (ctx) => {
     });
   }
 });
-//app.use("/(me)", checkAuth);
-//app.use("/(main)", alreadylogged);
 
 app.fsRoutes();
